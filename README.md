@@ -5,3 +5,5 @@ A variable-length integer or "varint" is a static Huffman encoding of 64-bit two
 
 
 ## Resources
+- [books](https://www.sqlite.org/books.html)
+- 
