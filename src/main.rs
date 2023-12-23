@@ -1,10 +1,9 @@
 use std::fs::File;
-use std::io::{prelude::*, BufReader};
+use std::io::BufReader;
 
 use anyhow::{bail, Result};
 
 use crate::page::Page;
-use crate::record::SerialValue;
 
 mod header;
 
@@ -38,7 +37,7 @@ fn main() -> Result<()> {
         }
 
         ".tables" => {
-            println!("{:?}", first_page.cell_offsets);
+            println!("{:?}", first_page.cell_offsets); // [3983, 3901, 3779]
 
             for i in 0..first_page.cell_count {
                 let record = first_page.read_cell(i)?;
@@ -53,7 +52,7 @@ fn main() -> Result<()> {
                     continue;
                 }
 
-                print!("{tbl_name} ");
+                print!("{tbl_name} "); // apples oranges
             }
 
             println!()
