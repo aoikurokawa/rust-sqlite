@@ -26,21 +26,13 @@ fn main() -> Result<()> {
     }
 
     let command = &args[2];
+    let file = File::open(&args[1])?;
+    let mut reader = BufReader::new(file);
+    let (header, first_page) = Page::read_first_page(&mut reader)?;
+
     match command.as_str() {
         ".dbinfo" => {
-            let file = File::open(&args[1])?;
-            let mut reader = BufReader::new(file);
-            let mut header = [0; HEADER_SIZE];
-            reader.read_exact(&mut header)?;
-            #[allow(unused_variables)]
-            let page_size = u16::from_be_bytes([header[16], header[17]]) as usize;
-            let first_page = Page::read(page_size - HEADER_SIZE, &mut reader)?;
-            let file = File::open(&args[1])?;
-            let mut reader = BufReader::new(file);
-            let (header, first_page) = Page::read_first_page(&mut reader)?;
-            println!("database page size: {page_size}");
-
-            println!("database page size: {}", header.page_size);
+                println!("database page size: {}", header.page_size);
 
             println!("number of tables: {}", first_page.cell_count);
         }
