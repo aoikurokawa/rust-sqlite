@@ -40,7 +40,6 @@ impl Varint {
     }
 }
 
-
 pub fn decode_varint(bytes: &[u8]) -> anyhow::Result<(i64, usize)> {
     if bytes.is_empty() || bytes.len() > 9 {
         return Err(anyhow::Error::msg(format!(
