@@ -1,163 +1,146 @@
-use anyhow::{bail, Error};
+use anyhow::{bail, Context};
 
-use crate::{header::Header, record::Record, varint::Varint};
+use crate::{database::DbHeader, decode_varint, record::Record};
+
+#[derive(Debug, Clone)]
+pub struct Page {
+    pub(crate) db_header: Option<DbHeader>,
+    pub(crate) btree_header: BTreePageHeader,
+    pub(crate) buffer: Vec<u8>,
+    pub cell_offsets: Vec<u16>,
+}
+
+impl Page {
+    pub fn new(idx: usize, header: DbHeader, b_tree_page: &[u8]) -> Self {
+        let mut db_header = None;
+        let btree_header;
+        let mut buffer = vec![];
+        buffer.extend_from_slice(b_tree_page);
+
+        if idx == 0 {
+            db_header = Some(header.clone());
+            btree_header = BTreePageHeader::new(&b_tree_page[100..112]).unwrap();
+            buffer.drain(0..100);
+        } else {
+            btree_header = BTreePageHeader::new(&b_tree_page[0..12]).unwrap();
+        }
+
+        let header_size: usize = match btree_header.page_type {
+            PageType::InteriorIndex | PageType::InteriorTable => 12,
+            _ => 8,
+        };
+
+        let ncells = btree_header.ncells as usize;
+        let mut cell_offsets = vec![0; ncells];
+        for i in 0..ncells {
+            let offset = header_size + i * 2;
+            cell_offsets[i] = u16::from_be_bytes([buffer[offset], buffer[offset + 1]]);
+        }
+
+        Self {
+            db_header,
+            btree_header,
+            buffer: b_tree_page.to_vec(),
+            cell_offsets,
+        }
+    }
+
+    // pub fn cell(&self, i: usize) -> Option<Cell> {
+    //     self.cells.get(i).cloned()
+    // }
+
+    pub fn read_cell(&self, i: u16) -> anyhow::Result<Record> {
+        if i >= self.btree_header.ncells {
+            bail!("Cell index out of range");
+        }
+
+        let offset = self.cell_offsets[i as usize] as usize;
+        eprintln!("offset: {offset}");
+
+        match self.btree_header.page_type {
+            PageType::LeafTable => {
+                let mut idx = offset;
+
+                let (npayload, bytes_read) = decode_varint(&self.buffer[idx..idx + 9])
+                    .context("decode varint for payload size")?;
+                idx += bytes_read;
+                eprintln!("payload size: {}", npayload);
+
+                let (rowid, bytes_read) = decode_varint(&self.buffer[idx..idx + 9])
+                    .context("decode varint for payload size")?;
+                idx += bytes_read;
+                eprintln!("row id: {}", rowid);
+
+                let end = idx + npayload as usize;
+                let payload = &self.buffer[idx..end];
+                let record = Record::new(payload).context("create new record")?;
+
+                Ok(record)
+            }
+            _ => todo!(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct BTreePageHeader {
+    /// The one-byte flag at offset 0 indicating the b-tree page type
+    page_type: PageType,
+
+    freeblock_offset: u16,
+    pub ncells: u16,
+    cells_start: u16,
+    nfragemented_free: u8,
+    right_most_pointer: u32,
+}
+
+impl BTreePageHeader {
+    pub fn new(header: &[u8]) -> anyhow::Result<Self> {
+        let page_type = PageType::try_from(u8::from_be_bytes([header[0]]))?;
+
+        Ok(Self {
+            page_type,
+            freeblock_offset: u16::from_be_bytes([header[1], header[2]]),
+            ncells: u16::from_be_bytes([header[3], header[4]]),
+            cells_start: u16::from_be_bytes([header[5], header[6]]),
+            nfragemented_free: u8::from_be_bytes([header[7]]),
+            right_most_pointer: u32::from_be_bytes([header[8], header[9], header[10], header[11]]),
+        })
+    }
+
+    pub fn ncells(&self) -> u16 {
+        self.ncells
+    }
+}
 
 #[repr(u8)]
-#[derive(Debug)]
-
+#[derive(Debug, Clone)]
 pub enum PageType {
-    InteriorIndex = 0x02,
+    /// A value of 2 (0x02) means the page is an interior index b-tree page
+    InteriorIndex = 2,
 
-    InteriorTable = 0x05,
+    /// A value of 5 (0x05) means the page is an interior table b-tree page
+    InteriorTable = 5,
 
-    LeafIndex = 0x0a,
+    /// A value of 10 (0x0a) means the page is a leaf index b-tree page
+    LeafIndex = 10,
 
-    LeafTable = 0x0d,
+    /// A value of 13 (0x0d) means the page is a leaf table b-tree page
+    LeafTable = 13,
 }
 
 impl TryFrom<u8> for PageType {
     type Error = anyhow::Error;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
-        Ok(match value {
-            0x02 => PageType::InteriorIndex,
-
-            0x05 => PageType::InteriorTable,
-
-            0x0a => PageType::LeafIndex,
-
-            0x0d => PageType::LeafTable,
-
-            _ => bail!("Invalid page type"),
-        })
-    }
-}
-
-#[derive(Debug)]
-
-pub struct Page {
-    data: Vec<u8>,
-
-    pub page_type: PageType,
-
-    pub freeblock_offset: Option<u16>,
-
-    pub cell_count: u16,
-
-    pub cell_content_offset: u16,
-
-    pub fragmented_free_bytes: u8,
-
-    pub rightmost_pointer: Option<u32>,
-
-    pub cell_offsets: Vec<u16>,
-}
-
-impl Page {}
-
-impl Page {
-    pub fn read_first_page<T: std::io::Read>(reader: &mut T) -> anyhow::Result<(Header, Self)> {
-        let mut header_data = [0; 100];
-
-        reader.read_exact(&mut header_data)?;
-
-        let header = Header::new(&header_data);
-
-        let mut page = Page::read(header.page_size - 100, reader)?;
-
-        let mut data = header_data.to_vec();
-
-        data.append(&mut page.data);
-
-        page.data = data;
-
-        Ok((header, page))
-    }
-
-    pub fn read<T: std::io::Read>(page_size: usize, reader: &mut T) -> anyhow::Result<Self> {
-        let mut data = vec![0; page_size];
-
-        reader.read_exact(&mut data)?;
-
-        let page_type = PageType::try_from(data[0])?;
-
-        let freeblock_offset = match u16::from_be_bytes([data[1], data[2]]) {
-            0 => None,
-
-            x => Some(x),
-        };
-
-        let cell_count = u16::from_be_bytes([data[3], data[4]]);
-
-        let cell_content_offset = u16::from_be_bytes([data[5], data[6]]);
-
-        let fragmented_free_bytes = data[7];
-
-        let rightmost_pointer = match page_type {
-            PageType::InteriorIndex | PageType::InteriorTable => {
-                Some(u32::from_be_bytes([data[8], data[9], data[10], data[11]]))
-            }
-
-            _ => None,
-        };
-
-        let mut cell_offsets: Vec<_> = vec![0; cell_count.into()];
-
-        let header_size: u16 = match page_type {
-            PageType::InteriorIndex | PageType::InteriorTable => 12,
-
-            _ => 8,
-        };
-
-        for i in 0..cell_count {
-            let offset = (header_size + i * 2) as usize;
-
-            cell_offsets[i as usize] = u16::from_be_bytes([data[offset], data[offset + 1]]);
-        }
-
-        Ok(Self {
-            data,
-
-            page_type,
-
-            cell_count,
-
-            cell_content_offset,
-
-            freeblock_offset,
-
-            fragmented_free_bytes,
-
-            rightmost_pointer,
-
-            cell_offsets,
-        })
-    }
-
-    pub fn read_cell(&self, i: u16) -> anyhow::Result<Record> {
-        if i >= self.cell_count {
-            bail!("Cell index out of range");
-        }
-
-        let offset = self.cell_offsets[i as usize] as usize;
-
-        match self.page_type {
-            PageType::LeafTable => {
-                let (payload_size, s0) = Varint::read(&self.data, offset);
-                eprintln!("payload size: {}", payload_size);
-
-                let (rowid, s1) = Varint::read(&self.data, offset + s0);
-                eprintln!("row id: {}", rowid);
-
-                let payload =
-                    &self.data[(offset + s0 + s1)..(offset + s0 + s1 + payload_size.0 as usize)];
-
-                let record = Record::new(payload);
-
-                Ok(record)
-            }
-
-            _ => todo!(),
+        match value {
+            2 => Ok(Self::InteriorIndex),
+            5 => Ok(Self::InteriorTable),
+            10 => Ok(Self::LeafIndex),
+            13 => Ok(Self::LeafTable),
+            num => Err(anyhow::Error::msg(format!(
+                "No corresponding PageType for value: {num}"
+            ))),
         }
     }
 }

@@ -1,63 +1,64 @@
-use std::fs::File;
-use std::io::BufReader;
-
 use anyhow::{bail, Result};
-
-use crate::page::Page;
-
-mod header;
-
-mod page;
-
-const HEADER_SIZE: usize = 100;
-
-mod record;
-
-mod varint;
+use rust_sqlite::{column::SerialValue, database::Database};
 
 fn main() -> Result<()> {
+    // Parse arguments
     let args = std::env::args().collect::<Vec<_>>();
-
     match args.len() {
         0 | 1 => bail!("Missing <database path> and <command>"),
         2 => bail!("Missing <command>"),
         _ => {}
     }
 
+    // Parse command and act accordingly
     let command = &args[2];
-    let file = File::open(&args[1])?;
-    let mut reader = BufReader::new(file);
-    let (header, first_page) = Page::read_first_page(&mut reader)?;
-
     match command.as_str() {
         ".dbinfo" => {
-            println!("database page size: {}", header.page_size);
+            let file_path = &args[1];
 
-            println!("number of tables: {}", first_page.cell_count);
+            let db = Database::read_file(file_path)?;
+            println!("database page size: {}", db.page_size());
+
+            println!("number of tables: {}", db.tables());
         }
-
         ".tables" => {
-            println!("{:?}", first_page.cell_offsets); // [3983, 3901, 3779]
+            let file_path = &args[1];
 
-            for i in 0..first_page.cell_count {
-                let record = first_page.read_cell(i)?;
+            let db = Database::read_file(file_path)?;
+            match db.pages.get(0) {
+                Some(first_page) => {
+                    eprintln!("cell offsets: {:?}", first_page.cell_offsets); // [3983, 3901, 3779]
 
-                if &record.values[0].unwrap_string() != "table" {
-                    continue;
+                    for i in 0..db.tables() {
+                        if let Ok(record) = first_page.read_cell(i) {
+                            eprintln!("{:?}", record.columns[0].data());
+                            match record.columns[0].data() {
+                                SerialValue::String(ref str) => {
+                                    if str != "table" {
+                                        continue;
+                                    }
+                                }
+                                _ => {}
+                            }
+
+                            eprintln!("{:?}", record.columns[2].data());
+                            let tbl_name = match record.columns[2].data() {
+                                SerialValue::String(ref str) => {
+                                    if str != "sqlite_sequence" {
+                                        continue;
+                                    }
+                                    str
+                                }
+                                _ => "",
+                            };
+
+                            eprintln!("{tbl_name}");
+                        };
+                    }
                 }
-
-                let tbl_name = record.values[2].unwrap_string();
-
-                if tbl_name == "sqlite_sequence" {
-                    continue;
-                }
-
-                print!("{tbl_name} "); // apples oranges
+                None => eprintln!("can not read first page"),
             }
-
-            println!()
         }
-
         _ => bail!("Missing or invalid command passed: {}", command),
     }
 
