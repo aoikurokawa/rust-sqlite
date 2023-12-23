@@ -32,25 +32,15 @@ impl SerialType {
     pub fn read(int: Varint) -> Self {
         match int.0 {
             0 => Self::Null,
-
             1 => Self::I8,
-
             2 => Self::I16,
-
             3 => Self::I24,
-
             4 => Self::I32,
-
             5 => Self::I48,
-
             6 => Self::I64,
-
             7 => Self::Float64,
-
             8 => Self::Zero,
-
             9 => Self::One,
-
             n if n >= 12 => {
                 if n % 2 == 0 {
                     Self::Blob(((n - 12) / 2) as usize)
@@ -141,6 +131,8 @@ pub struct Record {
 impl Record {
     pub fn new(data: &[u8]) -> Self {
         let (header_length, hl_size) = Varint::read(data, 0);
+        eprintln!("header length: {}", header_length);
+        eprintln!("hl size: {}", hl_size);
 
         let header_length = header_length.0 as usize;
 
@@ -154,10 +146,13 @@ impl Record {
 
         while header_index < header_length {
             let (int, len) = Varint::read(data, header_index);
-
             header_index += len;
+            eprintln!("int: {int}");
+            eprintln!("len: {len}");
+            eprintln!("header index: {header_index}");
 
             let serial_type = SerialType::read(int);
+            eprintln!("serial type: {serial_type:?}");
 
             // read data
 

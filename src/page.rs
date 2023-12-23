@@ -144,8 +144,10 @@ impl Page {
         match self.page_type {
             PageType::LeafTable => {
                 let (payload_size, s0) = Varint::read(&self.data, offset);
+                eprintln!("payload size: {}", payload_size);
 
                 let (rowid, s1) = Varint::read(&self.data, offset + s0);
+                eprintln!("row id: {}", rowid);
 
                 let payload =
                     &self.data[(offset + s0 + s1)..(offset + s0 + s1 + payload_size.0 as usize)];
