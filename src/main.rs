@@ -32,7 +32,7 @@ fn main() -> Result<()> {
 
     match command.as_str() {
         ".dbinfo" => {
-                println!("database page size: {}", header.page_size);
+            println!("database page size: {}", header.page_size);
 
             println!("number of tables: {}", first_page.cell_count);
         }

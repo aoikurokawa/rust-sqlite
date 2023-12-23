@@ -3,11 +3,9 @@ use anyhow::{bail, Error};
 use crate::{header::Header, record::Record, varint::Varint};
 
 #[repr(u8)]
-
 #[derive(Debug)]
 
 pub enum PageType {
-
     InteriorIndex = 0x02,
 
     InteriorTable = 0x05,
@@ -15,17 +13,13 @@ pub enum PageType {
     LeafIndex = 0x0a,
 
     LeafTable = 0x0d,
-
 }
 
 impl TryFrom<u8> for PageType {
-
     type Error = anyhow::Error;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
-
         Ok(match value {
-
             0x02 => PageType::InteriorIndex,
 
             0x05 => PageType::InteriorTable,
@@ -35,17 +29,13 @@ impl TryFrom<u8> for PageType {
             0x0d => PageType::LeafTable,
 
             _ => bail!("Invalid page type"),
-
         })
-
     }
-
 }
 
 #[derive(Debug)]
 
 pub struct Page {
-
     data: Vec<u8>,
 
     pub page_type: PageType,
@@ -61,17 +51,12 @@ pub struct Page {
     pub rightmost_pointer: Option<u32>,
 
     pub cell_offsets: Vec<u16>,
-
 }
 
-impl Page {
-
-}
+impl Page {}
 
 impl Page {
-
     pub fn read_first_page<T: std::io::Read>(reader: &mut T) -> anyhow::Result<(Header, Self)> {
-
         let mut header_data = [0; 100];
 
         reader.read_exact(&mut header_data)?;
@@ -87,11 +72,9 @@ impl Page {
         page.data = data;
 
         Ok((header, page))
-
     }
 
     pub fn read<T: std::io::Read>(page_size: usize, reader: &mut T) -> anyhow::Result<Self> {
-
         let mut data = vec![0; page_size];
 
         reader.read_exact(&mut data)?;
@@ -99,11 +82,9 @@ impl Page {
         let page_type = PageType::try_from(data[0])?;
 
         let freeblock_offset = match u16::from_be_bytes([data[1], data[2]]) {
-
             0 => None,
 
             x => Some(x),
-
         };
 
         let cell_count = u16::from_be_bytes([data[3], data[4]]);
@@ -113,37 +94,28 @@ impl Page {
         let fragmented_free_bytes = data[7];
 
         let rightmost_pointer = match page_type {
-
             PageType::InteriorIndex | PageType::InteriorTable => {
-
                 Some(u32::from_be_bytes([data[8], data[9], data[10], data[11]]))
-
             }
 
             _ => None,
-
         };
 
         let mut cell_offsets: Vec<_> = vec![0; cell_count.into()];
 
         let header_size: u16 = match page_type {
-
             PageType::InteriorIndex | PageType::InteriorTable => 12,
 
             _ => 8,
-
         };
 
         for i in 0..cell_count {
-
             let offset = (header_size + i * 2) as usize;
 
             cell_offsets[i as usize] = u16::from_be_bytes([data[offset], data[offset + 1]]);
-
         }
 
         Ok(Self {
-
             data,
 
             page_type,
@@ -159,43 +131,31 @@ impl Page {
             rightmost_pointer,
 
             cell_offsets,
-
         })
-
     }
 
     pub fn read_cell(&self, i: u16) -> anyhow::Result<Record> {
-
         if i >= self.cell_count {
-
             bail!("Cell index out of range");
-
         }
 
         let offset = self.cell_offsets[i as usize] as usize;
 
         match self.page_type {
-
             PageType::LeafTable => {
-
                 let (payload_size, s0) = Varint::read(&self.data, offset);
 
                 let (rowid, s1) = Varint::read(&self.data, offset + s0);
 
                 let payload =
-
                     &self.data[(offset + s0 + s1)..(offset + s0 + s1 + payload_size.0 as usize)];
 
                 let record = Record::new(payload);
 
                 Ok(record)
-
             }
 
             _ => todo!(),
-
         }
-
     }
-
 }
