@@ -59,6 +59,76 @@ fn main() -> Result<()> {
                 None => eprintln!("can not read first page"),
             }
         }
+        query if query.to_lowercase().starts_with("select") => {
+            let file_path = &args[1];
+            let sql_query = nom_sql::parse_query(query).expect("");
+            // let target_table = query.split(" ").last().expect("specify table name");
+
+            match sql_query {
+                nom_sql::SqlQuery::Select(select) => {
+                    let db = Database::read_file(file_path)?;
+                    if let Some(first_page) = db.pages.get(0) {
+                        for i in 0..db.tables() {
+                            if let Ok(record) = first_page.read_cell(i) {
+                                match record.columns[0].data() {
+                                    SerialValue::String(ref str) => {
+                                        if str != "table" {
+                                            continue;
+                                        }
+                                    }
+                                    _ => {}
+                                }
+
+                                match record.columns[2].data() {
+                                    SerialValue::String(str) => match str.as_str() {
+                                        "sqlite_sequence" => {
+                                            continue;
+                                        }
+                                        t_name => {
+                                            for table_name in &select.tables {
+                                                // println!("{:?}", target_table);
+                                                if table_name.name == t_name {
+                                                    match record.columns[3].data() {
+                                                        SerialValue::I8(num) => {
+                                                            // eprintln!("num: {num}");
+                                                            if let Some(page) =
+                                                                db.pages.get(*num as usize - 1)
+                                                            {
+                                                                let cell_len =
+                                                                    page.cell_offsets.len();
+                                                                println!("{:?}", cell_len);
+
+                                                                for i in 0..cell_len {
+                                                                    let record =
+                                                                        page.read_cell(i as u16)?;
+
+                                                                    println!(
+                                                                        "record: {:?}",
+                                                                        record.columns[1]
+                                                                    );
+                                                                }
+                                                            }
+                                                        }
+                                                        _ => {}
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        _ => {}
+                                    },
+
+                                    _ => {}
+                                }
+                            }
+
+                            // tables.push_str(&format!("{} ", tbl_name));
+                        }
+                    }
+                }
+                _ => todo!(),
+            }
+            // println!("{tables}");
+        }
         _ => bail!("Missing or invalid command passed: {}", command),
     }
 
