@@ -31,3 +31,4 @@ String("CREATE TABLE oranges\n(\n\tid integer primary key autoincrement,\n\tname
 ## Resources
 - [Database File Format](https://www.sqlite.org/fileformat.html)
 - [books](https://www.sqlite.org/books.html)
+- [Busying Oneself With B-Trees](https://medium.com/basecs/busying-oneself-with-b-trees-78bbf10522e7)
