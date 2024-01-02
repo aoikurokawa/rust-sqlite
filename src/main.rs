@@ -1,10 +1,9 @@
-use std::{collections::HashSet, time::Instant};
+use std::collections::HashSet;
 
 use anyhow::{bail, Result};
-use sqlite_starter_rust::{column::SerialValue, database::Database, sql::Sql};
+use rust_sqlite::{column::SerialValue, database::Database, sql::Sql};
 
 fn main() -> Result<()> {
-    let now = Instant::now();
     // Parse arguments
     let args = std::env::args().collect::<Vec<_>>();
     match args.len() {
@@ -191,3 +190,6 @@ fn main() -> Result<()> {
 
     Ok(())
 }
+
+
+
