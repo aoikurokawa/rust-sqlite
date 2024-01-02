@@ -1,30 +1,48 @@
 use std::collections::HashSet;
+use std::path::PathBuf;
 
 use anyhow::{bail, Result};
+use clap::{Parser, Subcommand};
 use rust_sqlite::{column::SerialValue, database::Database, sql::Sql};
 
-fn main() -> Result<()> {
-    // Parse arguments
-    let args = std::env::args().collect::<Vec<_>>();
-    match args.len() {
-        0 | 1 => bail!("Missing <database path> and <command>"),
-        2 => bail!("Missing <command>"),
-        _ => {}
-    }
+#[derive(Parser)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
 
-    let file_path = &args[1];
-    let db = Database::read_file(file_path)?;
-    // Parse command and act accordingly
-    let command = &args[2];
-    match command.as_str() {
-        ".dbinfo" => {
+#[derive(Subcommand)]
+enum Commands {
+    /// Show status information about the database
+    #[clap(name = ".dbinfo")]
+    DbInfo { db: PathBuf },
+
+    /// List names of tables matching LIKE pattern TABLE
+    #[clap(name = ".tables")]
+    Tables { db: PathBuf },
+
+    #[clap(name = ".query")]
+    Query { 
+        db: PathBuf,
+        statement: String
+    }
+}
+
+fn main() -> Result<()> {
+    let cli = Cli::parse();
+
+    match cli.command {
+        Commands::DbInfo { db } => {
+            let db = Database::read_file(db)?;
             println!("database page size: {}", db.page_size());
 
             if let Some(first_page) = db.pages.get(0) {
                 println!("number of tables: {}", first_page.btree_header.ncells());
             }
         }
-        ".tables" => match db.pages.get(0) {
+        Commands::Tables { db } => {
+            let db = Database::read_file(db)?;
+        match db.pages.get(0) {
             Some(first_page) => {
                 let mut tables = String::new();
                 for i in 0..first_page.btree_header.ncells() {
@@ -54,7 +72,16 @@ fn main() -> Result<()> {
                 println!("{tables}");
             }
             None => eprintln!("can not read first page"),
-        },
+        }
+    }
+        Commands::Query { db, statement } => {}
+
+    Ok(())
+}
+}
+
+
+    
         query if query.to_lowercase().starts_with("select count(*)") => {
             let select_statement = Sql::from_str(query);
 
@@ -185,11 +212,4 @@ fn main() -> Result<()> {
                 }
             }
         }
-        _ => bail!("Missing or invalid command passed: {}", command),
     }
-
-    Ok(())
-}
-
-
-
