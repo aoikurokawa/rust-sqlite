@@ -1,37 +1,48 @@
-use anyhow::{bail, Result};
-use rust_sqlite::{column::SerialValue, database::Database};
+use std::collections::HashSet;
+use std::path::PathBuf;
 
-fn main() -> Result<()> {
-    // Parse arguments
-    let args = std::env::args().collect::<Vec<_>>();
-    match args.len() {
-        0 | 1 => bail!("Missing <database path> and <command>"),
-        2 => bail!("Missing <command>"),
-        _ => {}
-    }
+use clap::{Parser, Subcommand};
+use rust_sqlite::{column::SerialValue, database::Database, sql::Sql};
 
-    // Parse command and act accordingly
-    let command = &args[2];
-    match command.as_str() {
-        ".dbinfo" => {
-            let file_path = &args[1];
+#[derive(Parser)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
 
-            let db = Database::read_file(file_path)?;
+#[derive(Subcommand)]
+enum Commands {
+    /// Show status information about the database
+    #[clap(name = ".dbinfo")]
+    DbInfo { db: PathBuf },
+
+    /// List names of tables matching LIKE pattern TABLE
+    #[clap(name = ".tables")]
+    Tables { db: PathBuf },
+
+    #[clap(name = ".query")]
+    Query { db: PathBuf, statement: String },
+}
+
+fn main() -> anyhow::Result<()> {
+    let cli = Cli::parse();
+
+    match cli.command {
+        Commands::DbInfo { db } => {
+            let db = Database::read_file(db)?;
             println!("database page size: {}", db.page_size());
 
-            println!("number of tables: {}", db.tables());
+            if let Some(first_page) = db.pages.get(0) {
+                println!("number of tables: {}", first_page.btree_header.ncells());
+            }
         }
-        ".tables" => {
-            let file_path = &args[1];
-
-            let db = Database::read_file(file_path)?;
+        Commands::Tables { db } => {
+            let db = Database::read_file(db)?;
             match db.pages.get(0) {
                 Some(first_page) => {
-                    eprintln!("cell offsets: {:?}", first_page.cell_offsets); // [3983, 3901, 3779]
-
-                    for i in 0..db.tables() {
-                        if let Ok(record) = first_page.read_cell(i) {
-                            eprintln!("{:?}", record.columns[0].data());
+                    let mut tables = String::new();
+                    for i in 0..first_page.btree_header.ncells() {
+                        if let Ok((_, Some(record))) = first_page.read_cell(i) {
                             match record.columns[0].data() {
                                 SerialValue::String(ref str) => {
                                     if str != "table" {
@@ -41,43 +52,103 @@ fn main() -> Result<()> {
                                 _ => {}
                             }
 
-                            eprintln!("{:?}", record.columns[2].data());
                             let tbl_name = match record.columns[2].data() {
                                 SerialValue::String(ref str) => {
-                                    if str != "sqlite_sequence" {
+                                    if str == "sqlite_sequence" {
                                         continue;
                                     }
-                                    str
+                                    &str
                                 }
                                 _ => "",
                             };
 
-                            eprintln!("{tbl_name}");
+                            tables.push_str(&format!("{} ", tbl_name));
                         };
                     }
+                    println!("{tables}");
                 }
                 None => eprintln!("can not read first page"),
             }
         }
-        query if query.to_lowercase().starts_with("select") => {
-            let file_path = &args[1];
-            let sql_query = nom_sql::parse_query(query).expect("");
-            // let target_table = query.split(" ").last().expect("specify table name");
+        Commands::Query { db, statement } => {
+            let db = Database::read_file(db)?;
 
-            match sql_query {
-                nom_sql::SqlQuery::Select(select) => {
-                    let db = Database::read_file(file_path)?;
-                    if let Some(first_page) = db.pages.get(0) {
-                        for i in 0..db.tables() {
-                            if let Ok(record) = first_page.read_cell(i) {
-                                match record.columns[0].data() {
-                                    SerialValue::String(ref str) => {
-                                        if str != "table" {
-                                            continue;
+            if statement.to_lowercase().starts_with("select count(*)") {
+                let select_statement = Sql::from_str(&statement);
+
+                if let Some(first_page) = db.pages.get(0) {
+                    for i in 0..first_page.btree_header.ncells() {
+                        if let Ok((_, Some(record))) = first_page.read_cell(i) {
+                            match record.columns[0].data() {
+                                SerialValue::String(ref str) => {
+                                    if str != "table" {
+                                        continue;
+                                    }
+                                }
+                                _ => {}
+                            }
+
+                            match record.columns[2].data() {
+                                SerialValue::String(str) => match str.as_str() {
+                                    "sqlite_sequence" => {
+                                        continue;
+                                    }
+                                    t_name => {
+                                        if select_statement.tbl_name == t_name {
+                                            match record.columns[3].data() {
+                                                SerialValue::I8(num) => {
+                                                    // eprintln!("num: {num}");
+                                                    if let Some(page) =
+                                                        db.pages.get(*num as usize - 1)
+                                                    {
+                                                        let cell_len = page.cell_offsets.len();
+                                                        println!("{:?}", cell_len);
+                                                    }
+                                                }
+                                                _ => {}
+                                            }
                                         }
                                     }
+                                },
+
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+            }
+
+            if statement.to_lowercase().starts_with("select") {
+                let select_statement = Sql::from_str(&statement);
+
+                if let Some(first_page) = db.pages.get(0) {
+                    for i in (0..first_page.btree_header.ncells()).rev() {
+                        match first_page.read_cell(i)? {
+                            (_, Some(record)) => {
+                                let mut rowids = HashSet::new();
+
+                                match record.columns[0].data() {
+                                    SerialValue::String(str) => match str.as_str() {
+                                        "index" => {
+                                            let index_statement =
+                                                Sql::from_str(&record.columns[4].data().display());
+                                            if let SerialValue::I8(num) = record.columns[3].data() {
+                                                db.read_index(
+                                                    *num as usize,
+                                                    &index_statement,
+                                                    &select_statement,
+                                                    &mut rowids,
+                                                );
+                                            }
+                                            continue;
+                                        }
+                                        _ => {}
+                                    },
                                     _ => {}
                                 }
+
+                                let mut rowids: Vec<i64> = rowids.into_iter().collect();
+                                rowids.sort_unstable();
 
                                 match record.columns[2].data() {
                                     SerialValue::String(str) => match str.as_str() {
@@ -85,52 +156,56 @@ fn main() -> Result<()> {
                                             continue;
                                         }
                                         t_name => {
-                                            for table_name in &select.tables {
-                                                // println!("{:?}", target_table);
-                                                if table_name.name == t_name {
-                                                    match record.columns[3].data() {
-                                                        SerialValue::I8(num) => {
-                                                            // eprintln!("num: {num}");
-                                                            if let Some(page) =
-                                                                db.pages.get(*num as usize - 1)
-                                                            {
-                                                                let cell_len =
-                                                                    page.cell_offsets.len();
-                                                                println!("{:?}", cell_len);
+                                            if select_statement.tbl_name == t_name {
+                                                match record.columns[3].data() {
+                                                    SerialValue::I8(num) => {
+                                                        let create_statement = Sql::from_str(
+                                                            &record.columns[4].data().display(),
+                                                        );
 
-                                                                for i in 0..cell_len {
-                                                                    let record =
-                                                                        page.read_cell(i as u16)?;
+                                                        let fields = select_statement
+                                                            .get_fields(&create_statement);
 
-                                                                    println!(
-                                                                        "record: {:?}",
-                                                                        record.columns[1]
-                                                                    );
-                                                                }
-                                                            }
+                                                        let mut row_set = HashSet::new();
+                                                        let mut rowid_set = HashSet::new();
+
+                                                        if rowids.is_empty() {
+                                                            db.read_table(
+                                                                *num as usize,
+                                                                &select_statement,
+                                                                fields,
+                                                                &mut row_set,
+                                                                &mut rowid_set,
+                                                            );
+                                                        } else {
+                                                            db.read_ids_from_table(
+                                                                *num as usize,
+                                                                &select_statement,
+                                                                fields,
+                                                                &mut row_set,
+                                                                &mut rowid_set,
+                                                                &rowids,
+                                                            );
                                                         }
-                                                        _ => {}
+
+                                                        row_set
+                                                            .iter()
+                                                            .for_each(|str| println!("{str}"));
                                                     }
+                                                    _ => {}
                                                 }
                                             }
                                         }
-                                        _ => {}
                                     },
-
                                     _ => {}
                                 }
                             }
-
-                            // tables.push_str(&format!("{} ", tbl_name));
+                            _ => {}
                         }
                     }
                 }
-                _ => todo!(),
             }
-            // println!("{tables}");
         }
-        _ => bail!("Missing or invalid command passed: {}", command),
     }
-
     Ok(())
 }

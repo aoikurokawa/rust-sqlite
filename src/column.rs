@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SerialType {
     /// Value is a NULL
     Null,
@@ -81,7 +81,7 @@ impl SerialType {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum SerialValue {
     Null,
     I8(i8),
@@ -95,6 +95,16 @@ pub enum SerialValue {
     One,
     Blob(Vec<u8>),
     String(String),
+}
+
+impl SerialValue {
+    pub fn display(&self) -> String {
+        match self {
+            SerialValue::Null => "".to_string(),
+            SerialValue::String(txt) => txt.to_string(),
+            _ => todo!(),
+        }
+    }
 }
 
 /// Each record consists of a key and optional data
@@ -117,3 +127,4 @@ impl Column {
         &self.data
     }
 }
+
