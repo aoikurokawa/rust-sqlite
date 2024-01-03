@@ -1,7 +1,6 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use anyhow::bail;
 use clap::{Parser, Subcommand};
 use rust_sqlite::{column::SerialValue, database::Database, sql::Sql};
 
@@ -118,6 +117,7 @@ fn main() -> anyhow::Result<()> {
                     }
                 }
             }
+
             if statement.to_lowercase().starts_with("select") {
                 let select_statement = Sql::from_str(&statement);
 
