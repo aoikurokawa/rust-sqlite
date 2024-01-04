@@ -34,7 +34,7 @@
 
 ```bash
 
-./your_sqlite3.sh .query sample.db "SELECT COUNT(*) FROM apples""
+./your_sqlite3.sh .query sample.db "SELECT COUNT(*) FROM apples"
 
 # Output
 
