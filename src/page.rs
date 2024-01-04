@@ -111,7 +111,7 @@ impl Page {
                 ]);
                 idx += 4;
 
-                let (rowid, _bytes_read) = decode_varint(&self.buffer[idx..idx + 9])
+                let (rowid, _bytes_read) = decode_varint(&self.buffer[idx..])
                     .context("decode varint for payload size")?;
                 // idx += bytes_read;
 
