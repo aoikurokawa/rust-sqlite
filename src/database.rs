@@ -148,15 +148,15 @@ impl Database {
                 let cell_len = page.cell_offsets.len();
 
                 if !select_statement.selection.is_empty() {
-                    for i in 0..cell_len {
-                        if let Some(page_num_left_child) = cells[i].page_number_left_child {
+                    for cell in cells.iter().take(cell_len) {
+                        if let Some(page_num_left_child) = cell.page_number_left_child {
                             page_idxes.push(page_num_left_child as usize - 1);
                         }
 
-                        if let Some(record) = &cells[i].record {
+                        if let Some(record) = &cell.record {
                             select_statement.print_rows(
                                 record,
-                                &cells[i].rowid,
+                                &cell.rowid,
                                 &fields,
                                 row_set,
                                 rowid_set,
@@ -209,9 +209,9 @@ impl Database {
                     match page.page_type() {
                         PageType::InteriorTable => {
                             let mut ids = ids;
-                            for i in 0..cell_len {
-                                let page_num_left_child = cells[i].page_number_left_child.unwrap();
-                                let key = cells[i].rowid.unwrap();
+                            for cell in cells.iter().take(cell_len) {
+                                let page_num_left_child = cell.page_number_left_child.unwrap();
+                                let key = cell.rowid.unwrap();
 
                                 let split_at = ids.split_at(ids.partition_point(|id| *id < key));
                                 let left_ids = split_at.0; // Ids to the left
