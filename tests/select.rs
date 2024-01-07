@@ -140,3 +140,32 @@ fn test_cli_select_multiple_field_with_where_superheroes_db() {
     assert_eq!(expects, outputs);
     assert!(output.status.success());
 }
+
+/*
+*
+* SELECT `field_name`, 'field_name` FROM `table` WHERE ...
+*
+* **/
+#[test]
+fn test_cli_select_multiple_field_with_where_companies_db() {
+    let output = build_select_field_command(
+        "companies.db",
+        "SELECT id, name FROM companies WHERE country = 
+'eritrea'",
+    );
+    let stdout = String::from_utf8(output.stdout).expect("parse to String");
+    let mut expects = vec![
+        "5729848|zara mining share company",
+        "121311|unilink s.c.",
+        "2102438|orange asmara it solutions",
+        "6634629|asmara rental",
+    ];
+
+    let mut outputs: Vec<&str> = stdout.lines().collect();
+
+    expects.sort();
+    outputs.sort();
+
+    assert_eq!(expects, outputs);
+    assert!(output.status.success());
+}
