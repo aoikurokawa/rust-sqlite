@@ -135,54 +135,52 @@ fn main() -> anyhow::Result<()> {
                                 let mut rowids: Vec<i64> = rowids.into_iter().collect();
                                 rowids.sort_unstable();
 
-                                match record.columns[2].data() {
-                                    SerialValue::String(str) => match str.as_str() {
+                                if let SerialValue::String(str) = record.columns[2].data() {
+                                    match str.as_str() {
                                         "sqlite_sequence" => {
                                             continue;
                                         }
                                         t_name => {
                                             if select_statement.tbl_name == t_name {
-                                                match record.columns[3].data() {
-                                                    SerialValue::I8(num) => {
-                                                        let create_statement = Sql::from_str(
-                                                            &record.columns[4].data().display(),
-                                                        )?;
+                                                if let SerialValue::I8(num) =
+                                                    record.columns[3].data()
+                                                {
+                                                    let create_statement = Sql::from_str(
+                                                        &record.columns[4].data().display(),
+                                                    )?;
 
-                                                        let fields = select_statement
-                                                            .get_fields(&create_statement);
+                                                    let fields = select_statement
+                                                        .get_fields(&create_statement);
 
-                                                        let mut row_set = HashSet::new();
-                                                        let mut rowid_set = HashSet::new();
+                                                    let mut row_set = HashSet::new();
+                                                    let mut rowid_set = HashSet::new();
 
-                                                        if rowids.is_empty() {
-                                                            db.read_table(
-                                                                *num as usize,
-                                                                &select_statement,
-                                                                fields,
-                                                                &mut row_set,
-                                                                &mut rowid_set,
-                                                            );
-                                                        } else {
-                                                            db.read_ids_from_table(
-                                                                *num as usize,
-                                                                &select_statement,
-                                                                fields,
-                                                                &mut row_set,
-                                                                &mut rowid_set,
-                                                                &rowids,
-                                                            );
-                                                        }
-
-                                                        row_set
-                                                            .iter()
-                                                            .for_each(|str| println!("{str}"));
+                                                    if rowids.is_empty() {
+                                                        db.read_table(
+                                                            *num as usize,
+                                                            &select_statement,
+                                                            fields,
+                                                            &mut row_set,
+                                                            &mut rowid_set,
+                                                        );
+                                                    } else {
+                                                        db.read_ids_from_table(
+                                                            *num as usize,
+                                                            &select_statement,
+                                                            fields,
+                                                            &mut row_set,
+                                                            &mut rowid_set,
+                                                            &rowids,
+                                                        );
                                                     }
-                                                    _ => {}
+
+                                                    row_set
+                                                        .iter()
+                                                        .for_each(|str| println!("{str}"));
                                                 }
                                             }
                                         }
-                                    },
-                                    _ => {}
+                                    }
                                 }
                             }
                         }
