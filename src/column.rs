@@ -127,4 +127,3 @@ impl Column {
         &self.data
     }
 }
-
