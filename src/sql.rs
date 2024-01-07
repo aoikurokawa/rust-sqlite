@@ -205,18 +205,16 @@ impl FromStr for Sql {
 
                             selection.insert(key, value);
                         }
-                        match &select.from[0].relation {
-                            TableFactor::Table {
-                                name,
-                                alias: _,
-                                args: _,
-                                with_hints: _,
-                                version: _,
-                                partitions: _,
-                            } => {
-                                tbl_name = name.0[0].value.to_string();
-                            }
-                            _ => {}
+                        if let TableFactor::Table {
+                            name,
+                            alias: _,
+                            args: _,
+                            with_hints: _,
+                            version: _,
+                            partitions: _,
+                        } = &select.from[0].relation
+                        {
+                            tbl_name = name.0[0].value.to_string();
                         }
                     }
                     _ => todo!(),
