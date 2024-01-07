@@ -197,13 +197,9 @@ impl FromStr for Sql {
                                 if let Expr::Identifier(ident) = *left.clone() {
                                     key = ident.value;
                                 }
-                                if let Expr::Value(val) = *right.clone() {
-                                    match val {
-                                        Value::SingleQuotedString(txt) => {
-                                            value = txt.to_string();
-                                        }
-                                        _ => {}
-                                    }
+                                if let Expr::Value(Value::SingleQuotedString(txt)) = *right.clone()
+                                {
+                                    value = txt.to_string();
                                 }
                             }
 
