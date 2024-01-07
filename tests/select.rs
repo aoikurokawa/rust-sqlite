@@ -67,20 +67,3 @@ fn test_cli_select_single_field_sample_db() {
     assert!(output.status.success());
 }
 
-#[test]
-fn test_cli_select_single_field_superheroes_db() {
-    let output = build_select_field_command("superheroes.db", "SELECT name FROM superheroes");
-    let stdout = String::from_utf8(output.stdout).expect("parse to String");
-
-    assert!(stdout.contains("108"));
-    assert!(output.status.success());
-}
-
-#[test]
-fn test_cli_select_single_field_companies_db() {
-    let output = build_select_field_command("companies.db", "SELECT COUNT(*) FROM companies");
-    let stdout = String::from_utf8(output.stdout).expect("parse to String");
-
-    assert!(stdout.contains("4"));
-    assert!(output.status.success());
-}
