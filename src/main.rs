@@ -1,5 +1,5 @@
-use std::collections::HashSet;
 use std::path::PathBuf;
+use std::{collections::HashSet, str::FromStr};
 
 use clap::{Parser, Subcommand};
 use rust_sqlite::{column::SerialValue, database::Database, sql::Sql};
@@ -75,7 +75,7 @@ fn main() -> anyhow::Result<()> {
 
             match statement {
                 stmt if stmt.to_lowercase().starts_with("select count(*)") => {
-                    let select_statement = Sql::from_str(&stmt);
+                    let select_statement = Sql::from_str(&stmt)?;
 
                     if let Some(first_page) = db.pages.get(0) {
                         for i in 0..first_page.btree_header.ncells() {
@@ -119,7 +119,7 @@ fn main() -> anyhow::Result<()> {
                     }
                 }
                 stmt if stmt.to_lowercase().starts_with("select") => {
-                    let select_statement = Sql::from_str(&stmt);
+                    let select_statement = Sql::from_str(&stmt)?;
 
                     if let Some(first_page) = db.pages.get(0) {
                         for i in (0..first_page.btree_header.ncells()).rev() {
@@ -132,7 +132,7 @@ fn main() -> anyhow::Result<()> {
                                             "index" => {
                                                 let index_statement = Sql::from_str(
                                                     &record.columns[4].data().display(),
-                                                );
+                                                )?;
                                                 if let SerialValue::I8(num) =
                                                     record.columns[3].data()
                                                 {
@@ -164,7 +164,7 @@ fn main() -> anyhow::Result<()> {
                                                         SerialValue::I8(num) => {
                                                             let create_statement = Sql::from_str(
                                                                 &record.columns[4].data().display(),
-                                                            );
+                                                            )?;
 
                                                             let fields = select_statement
                                                                 .get_fields(&create_statement);
