@@ -92,4 +92,3 @@ impl Record {
         Ok(Self { columns })
     }
 }
-

@@ -69,14 +69,19 @@ fn test_cli_select_single_field_sample_db() {
 
 /*
 *
-* SELECT `field_name` FROM `table`
+* SELECT `field_name`, `field_name` FROM `table`
 *
 * **/
 #[test]
 fn test_cli_select_multiple_field_sample_db() {
     let output = build_select_field_command("sample.db", "SELECT name, color FROM apples");
     let stdout = String::from_utf8(output.stdout).expect("parse to String");
-    let expects = vec!["Granny Smith|Light Green", "Fuji|Red", "Honeycrisp|Blush Red", "Golden Delicious|Yellow"];
+    let expects = vec![
+        "Granny Smith|Light Green",
+        "Fuji|Red",
+        "Honeycrisp|Blush Red",
+        "Golden Delicious|Yellow",
+    ];
 
     let outputs: Vec<&str> = stdout.lines().collect();
 
@@ -84,3 +89,23 @@ fn test_cli_select_multiple_field_sample_db() {
     assert!(output.status.success());
 }
 
+/*
+*
+* SELECT `field_name` FROM `table` WHERE ...
+*
+* **/
+#[test]
+fn test_cli_select_multiple_field_with_where_sample_db() {
+    let output = build_select_field_command(
+        "sample.db",
+        "SELECT name, color FROM apples WHERE color = 
+'Yellow'",
+    );
+    let stdout = String::from_utf8(output.stdout).expect("parse to String");
+    let expects = vec!["Golden Delicious|Yellow"];
+
+    let outputs: Vec<&str> = stdout.lines().collect();
+
+    assert_eq!(expects, outputs);
+    assert!(output.status.success());
+}
