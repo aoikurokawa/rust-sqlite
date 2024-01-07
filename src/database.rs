@@ -209,9 +209,9 @@ impl Database {
                     match page.page_type() {
                         PageType::InteriorTable => {
                             let mut ids = ids;
-                            for i in 0..cell_len {
-                                let page_num_left_child = cells[i].page_number_left_child.unwrap();
-                                let key = cells[i].rowid.unwrap();
+                            for cell in cells.iter().take(cell_len) {
+                                let page_num_left_child = cell.page_number_left_child.unwrap();
+                                let key = cell.rowid.unwrap();
 
                                 let split_at = ids.split_at(ids.partition_point(|id| *id < key));
                                 let left_ids = split_at.0; // Ids to the left
