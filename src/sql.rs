@@ -46,7 +46,7 @@ impl Sql {
         &self,
         record: &Record,
         rowid: &Option<i64>,
-        fields: &Vec<(usize, String)>,
+        fields: &[(usize, String)],
         row_set: &mut HashSet<String>,
         _rowid_set: &mut HashSet<i64>,
     ) {
