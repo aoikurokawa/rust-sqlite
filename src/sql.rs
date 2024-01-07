@@ -97,7 +97,7 @@ impl Sql {
         &self,
         record: &Record,
         rowid: &Option<i64>,
-        fields: &Vec<(usize, String)>,
+        fields: &[(usize, String)],
         row_set: &mut HashSet<String>,
         _rowid_set: &mut HashSet<i64>,
     ) {
@@ -182,33 +182,29 @@ impl FromStr for Sql {
                     SetExpr::Select(select) => {
                         for proj in select.projection {
                             match &proj {
-                                SelectItem::UnnamedExpr(expr) => match expr {
-                                    Expr::Identifier(ident) => {
+                                SelectItem::UnnamedExpr(expr) => {
+                                    if let Expr::Identifier(ident) = expr {
                                         field_name.push(ident.value.to_string());
                                     }
-                                    _ => {}
-                                },
+                                }
                                 _ => todo!(),
                             }
                         }
                         if let Some(expr) = &select.selection {
                             let mut key = String::new();
                             let mut value = String::new();
-                            match expr {
-                                Expr::BinaryOp { left, op: _, right } => {
-                                    if let Expr::Identifier(ident) = *left.clone() {
-                                        key = ident.value;
-                                    }
-                                    if let Expr::Value(val) = *right.clone() {
-                                        match val {
-                                            Value::SingleQuotedString(txt) => {
-                                                value = txt.to_string();
-                                            }
-                                            _ => {}
+                            if let Expr::BinaryOp { left, op: _, right } = expr {
+                                if let Expr::Identifier(ident) = *left.clone() {
+                                    key = ident.value;
+                                }
+                                if let Expr::Value(val) = *right.clone() {
+                                    match val {
+                                        Value::SingleQuotedString(txt) => {
+                                            value = txt.to_string();
                                         }
+                                        _ => {}
                                     }
                                 }
-                                _ => {}
                             }
 
                             selection.insert(key, value);
