@@ -56,21 +56,19 @@ fn build_select_field_command(db_name: &str, statement: &str) -> Output {
 }
 
 #[test]
-fn test_cli_tables_sample_db() {
+fn test_cli_select_single_field_sample_db() {
     let output = build_select_field_command("sample.db", "SELECT name FROM apples");
     let stdout = String::from_utf8(output.stdout).expect("parse to String");
+    let expects = vec!["Granny Smith", "Fuji", "Honeycrisp", "Golden Delicious"];
 
-    assert!(stdout.contains(
-        "Granny Smith
- Fuji
- Honeycrisp
- Golden Delicious"
-    ));
+    let outputs: Vec<&str> = stdout.lines().collect();
+
+    assert_eq!(expects, outputs);
     assert!(output.status.success());
 }
 
 #[test]
-fn test_cli_tables_superheroes_db() {
+fn test_cli_select_single_field_superheroes_db() {
     let output = build_select_field_command("superheroes.db", "SELECT name FROM superheroes");
     let stdout = String::from_utf8(output.stdout).expect("parse to String");
 
@@ -79,7 +77,7 @@ fn test_cli_tables_superheroes_db() {
 }
 
 #[test]
-fn test_cli_tables_companies_db() {
+fn test_cli_select_single_field_companies_db() {
     let output = build_select_field_command("companies.db", "SELECT COUNT(*) FROM companies");
     let stdout = String::from_utf8(output.stdout).expect("parse to String");
 
