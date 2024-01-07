@@ -54,7 +54,7 @@ fn main() -> anyhow::Result<()> {
                                     if str == "sqlite_sequence" {
                                         continue;
                                     }
-                                    &str
+                                    str
                                 }
                                 _ => "",
                             };
@@ -77,39 +77,32 @@ fn main() -> anyhow::Result<()> {
                     if let Some(first_page) = db.pages.get(0) {
                         for i in 0..first_page.btree_header.ncells() {
                             if let Ok((_, Some(record))) = first_page.read_cell(i) {
-                                match record.columns[0].data() {
-                                    SerialValue::String(ref str) => {
-                                        if str != "table" {
-                                            continue;
-                                        }
+                                if let SerialValue::String(ref str) = record.columns[0].data() {
+                                    if str != "table" {
+                                        continue;
                                     }
-                                    _ => {}
                                 }
 
-                                match record.columns[2].data() {
-                                    SerialValue::String(str) => match str.as_str() {
+                                if let SerialValue::String(str) = record.columns[2].data() {
+                                    match str.as_str() {
                                         "sqlite_sequence" => {
                                             continue;
                                         }
                                         t_name => {
                                             if select_statement.tbl_name == t_name {
-                                                match record.columns[3].data() {
-                                                    SerialValue::I8(num) => {
-                                                        // eprintln!("num: {num}");
-                                                        if let Some(page) =
-                                                            db.pages.get(*num as usize - 1)
-                                                        {
-                                                            let cell_len = page.cell_offsets.len();
-                                                            println!("{:?}", cell_len);
-                                                        }
+                                                if let SerialValue::I8(num) =
+                                                    record.columns[3].data()
+                                                {
+                                                    if let Some(page) =
+                                                        db.pages.get(*num as usize - 1)
+                                                    {
+                                                        let cell_len = page.cell_offsets.len();
+                                                        println!("{:?}", cell_len);
                                                     }
-                                                    _ => {}
                                                 }
                                             }
                                         }
-                                    },
-
-                                    _ => {}
+                                    }
                                 }
                             }
                         }
