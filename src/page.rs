@@ -8,18 +8,15 @@ pub struct Page {
     pub btree_header: BTreePageHeader,
     pub(crate) buffer: Vec<u8>,
     pub cell_offsets: Vec<u16>,
-    // pub cells: Vec<Cell>,
 }
 
 impl Page {
     pub fn new(idx: usize, db_header: Option<DbHeader>, b_tree_page: &[u8]) -> Self {
-        // let mut db_header = None;
         let btree_header;
         let mut buffer = vec![];
         buffer.extend_from_slice(b_tree_page);
 
         if idx == 0 {
-            // db_header = Some(header.clone());
             btree_header = BTreePageHeader::new(&b_tree_page[100..112]).unwrap();
             buffer.drain(0..100);
         } else {
@@ -32,16 +29,11 @@ impl Page {
         };
 
         let ncells = btree_header.ncells as usize;
-        // let mut cells = Vec::new();
         let mut cell_offsets = vec![0; ncells];
-        for i in 0..ncells {
+        for (i, cell_offset) in cell_offsets.iter_mut().enumerate().take(ncells) {
             let offset = header_size + i * 2;
             let num = u16::from_be_bytes([buffer[offset], buffer[offset + 1]]);
-            cell_offsets[i] = num;
-
-            // let cell = Cell::from_bytes(&btree_header.page_type, num as usize, &b_tree_page)
-            //     .expect("construct a cell");
-            // cells.push(cell);
+            *cell_offset = num;
         }
 
         Self {
@@ -49,7 +41,6 @@ impl Page {
             btree_header,
             buffer: b_tree_page.to_vec(),
             cell_offsets,
-            // cells,
         }
     }
 
@@ -76,11 +67,6 @@ impl Page {
                     .context("decode varint for payload size")?;
                 idx += bytes_read;
 
-                // let end = if npayload as usize > self.buffer.len() {
-                //     self.buffer.len()
-                // } else {
-                //     idx + npayload as usize
-                // };
                 let end = idx + npayload as usize;
                 let payload = &self.buffer[idx..end];
                 let record = Record::new(payload).context("create new record")?;
