@@ -43,13 +43,10 @@ fn main() -> anyhow::Result<()> {
                     let mut tables = String::new();
                     for i in 0..first_page.btree_header.ncells() {
                         if let Ok((_, Some(record))) = first_page.read_cell(i) {
-                            match record.columns[0].data() {
-                                SerialValue::String(ref str) => {
-                                    if str != "table" {
-                                        continue;
-                                    }
+                            if let SerialValue::String(ref str) = record.columns[0].data() {
+                                if str != "table" {
+                                    continue;
                                 }
-                                _ => {}
                             }
 
                             let tbl_name = match record.columns[2].data() {
