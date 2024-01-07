@@ -91,7 +91,7 @@ fn test_cli_select_multiple_field_sample_db() {
 
 /*
 *
-* SELECT `field_name` FROM `table` WHERE ...
+* SELECT `field_name`, `field_name` FROM `table` WHERE ...
 *
 * **/
 #[test]
@@ -105,6 +105,37 @@ fn test_cli_select_multiple_field_with_where_sample_db() {
     let expects = vec!["Golden Delicious|Yellow"];
 
     let outputs: Vec<&str> = stdout.lines().collect();
+
+    assert_eq!(expects, outputs);
+    assert!(output.status.success());
+}
+
+/*
+*
+* SELECT `field_name`, 'field_name` FROM `table` WHERE ...
+*
+* **/
+#[test]
+fn test_cli_select_multiple_field_with_where_superheroes_db() {
+    let output = build_select_field_command(
+        "superheroes.db",
+        "SELECT id, name FROM superheroes WHERE eye_color = 
+'Pink Eyes'",
+    );
+    let stdout = String::from_utf8(output.stdout).expect("parse to String");
+    let mut expects = vec![
+        "297|Stealth (New Earth)",
+        "1085|Felicity (New Earth)",
+        "3913|Matris Ater Clementia (New Earth)",
+        "3289|Angora Lapin (New Earth)",
+        "790|Tobias Whale (New Earth)",
+        "2729|Thrust (New Earth)",
+    ];
+
+    let mut outputs: Vec<&str> = stdout.lines().collect();
+
+    expects.sort();
+    outputs.sort();
 
     assert_eq!(expects, outputs);
     assert!(output.status.success());
